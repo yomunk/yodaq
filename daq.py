@@ -80,7 +80,8 @@ class YoDAQwindow(wx.Frame):
                 for a_match in self.sample_format.findall(line_data):
                     x.append(self.vref*float(a_match.split()[1])/(2**self.resolution))
 
-                self.data.append(x)
+                if len(x) == 2:
+                    self.data.append(x)
 
         self.data_array = np.array(self.data)
         #print self.data_array.shape
