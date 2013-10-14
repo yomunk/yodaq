@@ -1,3 +1,5 @@
+#!/usr/bin/env python2
+
 import serial
 import re
 import wx
@@ -32,7 +34,9 @@ class YoDAQwindow(wx.Frame):
         self.data = []
 
         self.resolution = 12
-        self.vref = 3.3
+	self.vref = 3.3
+        self.vmax = 1.85
+	self.vmin = 1.45
         self.window = 2.0
 
         # Create plot area and axes
@@ -90,7 +94,7 @@ class YoDAQwindow(wx.Frame):
         if self.data_array.shape[0] > 0:
             self.ax.cla()
             self.ax.autoscale(False)
-            self.ax.set_ylim(0, self.vref)
+            self.ax.set_ylim(self.vmin, self.vmax)
 
             for i in range(1, self.data_array.shape[1]):
                 self.ax.plot(self.data_array[:,0], self.data_array[:,i])
@@ -118,7 +122,7 @@ class YoDAQwindow(wx.Frame):
             self.data = []
             if self.ser.isOpen():
                 self.ser.flushInput()
-                self.ser.write('CMD I1 D100')
+                self.ser.write('CMD I1 D1000')
                 self.timer.Start(500)
                 self.start_stop_button.SetLabel("Stop")
         else:
