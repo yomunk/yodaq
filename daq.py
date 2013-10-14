@@ -71,7 +71,7 @@ class DataLoggerWindow(wx.Frame):
             if self.line_format.match(line_data):
                 x = []
                 # Add the line to the log text box
-                # self.log_text.AppendText(sample_string)
+                self.log_text.AppendText(line_data)
                 t_match = self.time_format.match(line_data).group()
                 x.append(float(t_match.split()[1]) / 1e6)
                 for a_match in self.sample_format.findall(line_data):
