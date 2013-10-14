@@ -1,7 +1,7 @@
 import serial
 import re
 import wx
-import numpy
+import numpy as np
 import matplotlib
 matplotlib.use('WXAgg')
 from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg
@@ -10,19 +10,27 @@ import matplotlib.pyplot as plt
 
 class DataLoggerWindow(wx.Frame):
     def __init__(self):
-        wx.Frame.__init__(self, None, -1, "YoDAQ", (100,100), (640,480))
+        wx.Frame.__init__(self, None, -1, "yodaq", (100,100), (640,480))
 
         self.SetBackgroundColour('#ece9d8')
 
-        # Flag variables
+        self.ser = serial.Serial()
+        self.ser.baudrate = 115200
+        self.ser.timeout=0.25
+        self.ser.port = '/dev/ttyACM0'
+        self.ser.open()
         self.isLogging = False
 
-        self.r = re.compile('\d* \d*\r\n')
+        self.line_format = re.compile('T: \d*( : A\d: \d*)+')
+        self.time_format = re.compile('T: \d*')
+        self.sample_format = re.compile('A\d: \d*')
+
         # Create data buffers
-        self.N = 1000
-        self.n = range(self.N)
-        self.t = numpy.ones(self.N)
-        self.x = numpy.ones(self.N)
+        self.data = []
+
+        self.resolution = 12
+        self.vref = 3.3
+        self.window = 2.0
 
         # Create plot area and axes
         self.fig = Figure(facecolor='#ece9d8')
@@ -30,74 +38,91 @@ class DataLoggerWindow(wx.Frame):
         self.canvas.SetPosition((0,0))
         self.canvas.SetSize((640,320))
         self.ax = self.fig.add_axes([0.08,0.1,0.86,0.8])
-        self.ax.autoscale(False)
-        self.ax.set_xlim(0, 1)
-        self.ax.set_ylim(-.5, .5)
-        self.ax.plot(self.t,self.x)
+        self.ax.set_xlabel('Time (s)')
+        self.ax.set_ylabel('Voltage (V)')
+        #self.ax.autoscale(False)
+        self.ax.set_xlim(0, self.window)
+        self.ax.set_ylim(0, self.vref)
+        #self.ax.plot(self.t,self.x)
 
         # Create text box for event logging
         self.log_text = wx.TextCtrl(
-            self, -1, pos=(140,320), size=(465,100),
+            self, -1, pos=(140,350), size=(465,70),
             style=wx.TE_MULTILINE)
         self.log_text.SetFont(
             wx.Font(12, wx.DEFAULT, wx.NORMAL, wx.NORMAL, False))
 
         # Create timer to read incoming data and scroll plot
         self.timer = wx.Timer(self)
-        self.Bind(wx.EVT_TIMER, self.GetSample, self.timer)
+        self.Bind(wx.EVT_TIMER, self.readSerial, self.timer)
 
         # Create start/stop button
         self.start_stop_button = wx.Button(
-            self, label="Start", pos=(25,320), size=(100,100))
+            self, label="Start", pos=(25,350), size=(100,70))
         self.start_stop_button.SetFont(
             wx.Font(14, wx.DEFAULT, wx.NORMAL, wx.NORMAL, False))
         self.start_stop_button.Bind(
             wx.EVT_BUTTON, self.onStartStopButton)
 
-    def GetSample(self, event=None):
-        # Get a line of text from the serial port
+    def readSerial(self, event=None):
         while self.ser.inWaiting() > 0:
-            sample_string = self.ser.readline()
+            line_data = self.ser.readline()
 
-            if self.r.match(sample_string):
+            if self.line_format.match(line_data):
+                x = []
                 # Add the line to the log text box
-                self.log_text.AppendText(sample_string)
+                # self.log_text.AppendText(sample_string)
+                t_match = self.time_format.match(line_data).group()
+                x.append(float(t_match.split()[1]) / 1e6)
+                for a_match in self.sample_format.findall(line_data):
+                    x.append(self.vref*float(a_match.split()[1])/(2**self.resolution))
 
-                # If the line is the right length, parse it
-                sample_values = sample_string[0:-2].split()
+                self.data.append(x)
 
-                self.t[0:self.N-1] = self.t[1:]
-                self.t[self.N-1] =float(sample_values[0])/1e6
-                self.x[0:self.N-1] = self.x[1:]
-                self.x[self.N-1] = 3.3*float(sample_values[1])/4096 - 1.65
+        self.data_array = np.array(self.data)
+        #print self.data_array.shape
 
         # Update plot
-        self.ax.cla()
-        self.ax.autoscale(False)
-        self.ax.set_xlim(self.t[0], self.t[-1])
-        self.ax.set_ylim(-.5, .5)
-        self.ax.hlines(0, self.t[0], self.t[-1], colors='r')
-        self.ax.plot(self.t, self.x)
-        self.canvas.draw()
+        if self.data_array.shape[0] > 0:
+            self.ax.cla()
+            self.ax.autoscale(False)
+            self.ax.set_ylim(0, self.vref)
+
+            for i in range(1, self.data_array.shape[1]):
+                self.ax.plot(self.data_array[:,0], self.data_array[:,i])
+
+            self.ax.set_xlabel('Time (s)')
+            self.ax.set_ylabel('Voltage (V)')
+
+            last_t = self.data_array[-1,0]
+            if last_t < self.window:
+                self.ax.set_xlim(0, self.window)
+            else:
+                self.ax.set_xlim(last_t-self.window, last_t)
+
+            self.ax.hlines(self.vref/2, self.ax.axis()[0], self.ax.axis()[1], colors='r')
+
+            self.canvas.draw()
+
 
     def onStartStopButton(self, event):
         if not self.isLogging:
             self.isLogging = True
-            self.ser = serial.Serial()
-            self.ser.baudrate = 115200
-            self.ser.timeout=0.25
-            self.ser.port = '/dev/ttyACM0'
-            self.ser.open()
+            self.data = []
             if self.ser.isOpen():
-                # We successfully opened a port, so start
-                # a timer to read incoming data
-                self.timer.Start(100)
+                self.ser.flushInput()
+                self.ser.write('CMD I3 D10000')
+                self.timer.Start(500)
                 self.start_stop_button.SetLabel("Stop")
         else:
+            self.isLogging=False
+            self.ser.write(' ')
             self.timer.Stop()
-            self.ser.close()
-            self.isLogging = False
             self.start_stop_button.SetLabel("Start")
+
+    def OnClose(self, event):
+        self.ser.close()
+        self.Destroy()
 
 if __name__ == '__main__':
     app = wx.PySimpleApp()
