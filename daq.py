@@ -8,7 +8,7 @@ from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 
-class DataLoggerWindow(wx.Frame):
+class YoDAQwindow(wx.Frame):
     def __init__(self):
         wx.Frame.__init__(self, None, -1, "yodaq", (100,100), (640,480))
 
@@ -18,7 +18,10 @@ class DataLoggerWindow(wx.Frame):
         self.ser.baudrate = 115200
         self.ser.timeout=0.25
         self.ser.port = '/dev/ttyACM0'
-        self.ser.open()
+        try:
+            self.ser.open()
+        except:
+            pass
         self.isLogging = False
 
         self.line_format = re.compile('T: \d*( : A\d: \d*)+')
@@ -45,6 +48,8 @@ class DataLoggerWindow(wx.Frame):
         self.ax.set_ylim(0, self.vref)
         #self.ax.plot(self.t,self.x)
 
+        self.cid = self.canvas.mpl_connect('button_press_event', self.onClick)
+
         # Create text box for event logging
         self.log_text = wx.TextCtrl(
             self, -1, pos=(140,350), size=(465,70),
@@ -70,8 +75,6 @@ class DataLoggerWindow(wx.Frame):
 
             if self.line_format.match(line_data):
                 x = []
-                # Add the line to the log text box
-                self.log_text.AppendText(line_data)
                 t_match = self.time_format.match(line_data).group()
                 x.append(float(t_match.split()[1]) / 1e6)
                 for a_match in self.sample_format.findall(line_data):
@@ -104,6 +107,9 @@ class DataLoggerWindow(wx.Frame):
 
             self.canvas.draw()
 
+    def onClick(self, event):
+        # Add the line to the log text box
+        self.log_text.AppendText('X: {:.3f}\tY: {:.3f}\n'.format(event.xdata, event.ydata))
 
     def onStartStopButton(self, event):
         if not self.isLogging:
@@ -111,7 +117,7 @@ class DataLoggerWindow(wx.Frame):
             self.data = []
             if self.ser.isOpen():
                 self.ser.flushInput()
-                self.ser.write('CMD I3 D10000')
+                self.ser.write('CMD I1 D100')
                 self.timer.Start(500)
                 self.start_stop_button.SetLabel("Stop")
         else:
@@ -126,7 +132,7 @@ class DataLoggerWindow(wx.Frame):
 
 if __name__ == '__main__':
     app = wx.PySimpleApp()
-    window = DataLoggerWindow()
+    window = YoDAQwindow()
 
     window.Show()
     app.MainLoop()
