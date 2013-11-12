@@ -21,7 +21,7 @@ N_CHANS=1
 
 class YoDAQwindow(wx.Frame):
     def __init__(self):
-        wx.Frame.__init__(self, None, -1, "yodaq", (100,100), (1024,800))
+        wx.Frame.__init__(self, None, -1, "yodaq", (100,100), (1024,600))
 
         self.SetBackgroundColour('#ece9d8')
 
@@ -50,13 +50,13 @@ class YoDAQwindow(wx.Frame):
         self.fig = Figure(facecolor='#ece9d8')
         self.canvas = FigureCanvasWxAgg(self, -1, self.fig)
         self.canvas.SetPosition((0,0))
-        self.canvas.SetSize((1024,700))
-        self.ax = self.fig.add_axes([0.08,0.35,0.86,0.6])
+        self.canvas.SetSize((1024,500))
+        self.ax = self.fig.add_axes([0.08,0.4,0.86,0.55])
         self.ax.set_ylabel('Voltage (V)')
         self.ax.set_xlim(0, self.window)
         self.ax.set_ylim(0, self.vref)
 
-        self.scrub_ax = self.fig.add_axes([0.08,0.1,0.86,0.2])
+        self.scrub_ax = self.fig.add_axes([0.08,0.15,0.86,0.2])
         self.scrub_ax.set_ylabel('Voltage (V)')
         self.scrub_ax.set_xlabel('Time (s)')
 
