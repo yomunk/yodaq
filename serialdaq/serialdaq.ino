@@ -27,7 +27,7 @@ void loop() {
         Serial.print(num_inputs);
         Serial.print(" input with a ");
         Serial.print(sample_delay);
-        Serial.println(" microsecond delay between sample acquisitions.");
+        Serial.println(" millisecond delay between sample acquisitions.");
         delay(300);
         acquireData();
       }
@@ -52,10 +52,10 @@ int parseCommand() {
 }
 
 void acquireData() {
-    unsigned long startTime = micros();
+    unsigned long startTime = millis();
     while (Serial.available() == 0) {
       Serial.print("T: ");
-      Serial.print(micros()-startTime);
+      Serial.print(millis()-startTime);
       for (int i=0; i<num_inputs;i++) {
         Serial.print(" : A");
         Serial.print(i);
@@ -63,7 +63,7 @@ void acquireData() {
         Serial.print(analogRead(i));
       }
       Serial.println();
-      delayMicroseconds(sample_delay);
+      delay(sample_delay);
     }
 }    
       
